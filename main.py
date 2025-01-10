@@ -1,25 +1,35 @@
-from fastapi import FastAPI, File, UploadFile
+import io
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse, JSONResponse
 from PIL import Image
 from rembg import remove
 from io import BytesIO
+from enhance import enhance_image
 
 app = FastAPI()
 
+@app.post("/enhance")
+async def enhance_photo(file: UploadFile = File(...)):
+    try:
+        image_bytes = await file.read()
+
+        enhanced_image_bytes = enhance_image(image_bytes)
+
+        return StreamingResponse(
+            io.BytesIO(enhanced_image_bytes),
+            media_type="image/png",
+            headers={"Content-Disposition": "attachment; filename=enhanced_image.png"}
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error enhancing image: {str(e)}")
+
 @app.post("/remove_bg/")
 async def remove_bg(file: UploadFile = File(...)):
-    """
-    Removes the background from an uploaded image file.
-    """
+
     try:
-        # Read the uploaded file
         contents = await file.read()
-        input_image = Image.open(BytesIO(contents))
 
-        # Ensure image is in a format rembg can handle
-        input_image = input_image.convert("RGBA")
-
-        # Remove the background
         output = remove(contents)
 
         # Convert output to an image
